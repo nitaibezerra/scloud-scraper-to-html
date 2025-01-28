@@ -296,7 +296,6 @@ def main():
     creates a ZIP, and generates an HTML page.
     """
     strings = [
-        "A2 - https://on.soundcloud.com/axJaEesGeWmSFbSP9",
         "B1 https://on.soundcloud.com/KG2gZ6KqNwbZrM4q9",
         "https://on.soundcloud.com/4ht4PfBFpsLjFSnx9",
         "https://on.soundcloud.com/oWAvTRXLWSN9BXLV8",
