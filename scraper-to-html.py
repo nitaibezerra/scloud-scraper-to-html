@@ -1,6 +1,15 @@
 import os
 import re
 import subprocess
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+
 
 class SoundCloudDownloader:
     """
@@ -26,6 +35,9 @@ class SoundCloudDownloader:
 
         # Create necessary directories
         os.makedirs(self.output_dir, exist_ok=True)
+        logging.debug(
+            f"Initialized SoundCloudDownloader with output directory: {self.output_dir}"
+        )
 
     def process_strings(self, strings):
         """
@@ -34,9 +46,17 @@ class SoundCloudDownloader:
 
         :param strings: List of strings that may contain SoundCloud links
         """
+        logging.info("Starting to process strings.")
         self._extract_soundcloud_links(strings)
+        logging.info(
+            f"Extracted {len(self._soundcloud_links)} SoundCloud links: {self._soundcloud_links}"
+        )
+
         self._download_tracks()
+        logging.info("Completed downloading tracks.")
+
         self._generate_html_page()
+        logging.info("Generated HTML page.")
 
     def _extract_soundcloud_links(self, strings):
         """
@@ -45,7 +65,8 @@ class SoundCloudDownloader:
 
         :param strings: List of strings that may contain SoundCloud links
         """
-        pattern = r'(https?://soundcloud\.com/[^\s]+)'
+        logging.debug("Extracting SoundCloud links from input strings.")
+        pattern = r"(https?://on\.soundcloud\.com/[^\s]+)"
         found_links = []
 
         for text in strings:
@@ -54,6 +75,7 @@ class SoundCloudDownloader:
 
         # Remove duplicates
         self._soundcloud_links = list(set(found_links))
+        logging.debug(f"Found links: {self._soundcloud_links}")
 
     def _download_tracks(self):
         """
@@ -62,7 +84,9 @@ class SoundCloudDownloader:
         The result of each download (link + names of MP3 files) is stored
         in self._download_results.
         """
+        logging.debug("Starting to download tracks.")
         for link in self._soundcloud_links:
+            logging.info(f"Downloading from link: {link}")
             files_before = set(os.listdir(self.output_dir))
             self._run_scdl_command(link)
             files_after = set(os.listdir(self.output_dir))
@@ -72,7 +96,10 @@ class SoundCloudDownloader:
             mp3_files = [f for f in new_files if f.lower().endswith(".mp3")]
 
             if mp3_files:
+                logging.info(f"Downloaded files: {mp3_files}")
                 self._download_results.append((link, mp3_files))
+            else:
+                logging.warning(f"No files downloaded for link: {link}")
 
     def _run_scdl_command(self, link):
         """
@@ -81,16 +108,12 @@ class SoundCloudDownloader:
 
         :param link: SoundCloud URL to download
         """
-        cmd = [
-            "scdl",
-            "--path", self.output_dir,
-            "-l", link,
-            "-f"
-        ]
+        cmd = ["scdl", "-l", link, "--path", self.output_dir]
         try:
+            logging.debug(f"Executing command: {' '.join(cmd)}")
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as e:
-            print(f"Error downloading {link}: {e}")
+            logging.error(f"Error downloading {link}: {e}")
 
     def _generate_html_page(self):
         """
@@ -98,6 +121,7 @@ class SoundCloudDownloader:
         downloaded tracks in the directory self.output_dir. Each track includes
         its title, an audio player, and a link to the original SoundCloud page.
         """
+        logging.debug("Generating HTML page.")
         html_path = os.path.join(self.output_dir, "index.html")
 
         with open(html_path, "w", encoding="utf-8") as f:
@@ -113,19 +137,55 @@ class SoundCloudDownloader:
             for link, mp3_files in self._download_results:
                 for mp3_file in mp3_files:
                     title = os.path.splitext(mp3_file)[0]
-                    mp3_path = mp3_file  # Adjust if using a different directory structure
+                    mp3_path = (
+                        mp3_file  # Adjust if using a different directory structure
+                    )
 
                     f.write("  <div>\n")
                     f.write(f"    <h2>{title}</h2>\n")
                     f.write("    <audio controls>\n")
                     f.write(f"      <source src='{mp3_path}' type='audio/mpeg'>\n")
                     f.write("    </audio>\n")
-                    f.write(f"    <p><a href='{link}' target='_blank'>Original SoundCloud Link</a></p>\n")
+                    f.write(
+                        f"    <p><a href='{link}' target='_blank'>Original SoundCloud Link</a></p>\n"
+                    )
                     f.write("  </div>\n")
                     f.write("  <hr/>\n")
 
             f.write("</body>\n")
             f.write("</html>\n")
 
-        print(f"HTML page generated at: {html_path}")
-        print(f"MP3 files are located in: {self.output_dir}")
+        logging.info(f"HTML page generated at: {html_path}")
+
+
+def main():
+    """
+    Main function to run the script directly. It processes a predefined
+    list of SoundCloud links, downloads the tracks, and generates an HTML page.
+    """
+    strings = [
+        "A2 - https://on.soundcloud.com/axJaEesGeWmSFbSP9",
+        "B1 https://on.soundcloud.com/KG2gZ6KqNwbZrM4q9",
+        "https://on.soundcloud.com/4ht4PfBFpsLjFSnx9",
+        "https://on.soundcloud.com/oWAvTRXLWSN9BXLV8",
+        "B4 https://on.soundcloud.com/41vQDeBNFVnh4PAB8",
+        "B5 https://on.soundcloud.com/w4o34Yk8hDy8iJTj6",
+        "B6 https://on.soundcloud.com/XXMCejYF6ySkJ6Nm9",
+        "B7 https://on.soundcloud.com/sCgPPArMLFxd4bsK8",
+        "B8 https://on.soundcloud.com/55N3TqKMVwPUMuYY7",
+        "B9 https://on.soundcloud.com/G9dKEZVpCgGPZATo9",
+        "B10 https://on.soundcloud.com/VkWWKFPKKmX3Rznn6",
+        "B11 https://on.soundcloud.com/9bQvbKfx8qH96GcW6",
+        "B12 https://on.soundcloud.com/1q4jQM4EWWUTusgG7",
+    ]
+
+    logging.info("Starting SoundCloudDownloader script.")
+    downloader = SoundCloudDownloader(
+        base_dir="html", sub_dir_name="soundcloud_downloads"
+    )
+    downloader.process_strings(strings)
+    logging.info("Finished processing SoundCloud links.")
+
+
+if __name__ == "__main__":
+    main()
