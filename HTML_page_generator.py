@@ -22,11 +22,13 @@ class SoundCloudHTMLPageGenerator:
         """
         :param download_results: The list of (soundcloud_link, [(mp3_file, cover_image), ...])
                                  preserving the original order.
-        :param output_dir: The directory where the 'index.html' and MP3 files reside.
+        :param output_dir: The directory where MP3 files, images, and other resources are stored.
         """
         self.download_results = download_results
         self.output_dir = output_dir
-        self.html_path = os.path.join(self.output_dir, "index.html")
+        self.html_path = os.path.join(
+            self.output_dir, "../index.html"
+        )  # Root directory
         self.zip_name = "all_tracks.zip"
         self.zip_path = os.path.join(self.output_dir, self.zip_name)
 
@@ -60,8 +62,10 @@ class SoundCloudHTMLPageGenerator:
                 self.ordered_tracks.append(
                     {
                         "anchor_id": anchor_id,
-                        "mp3_file": mp3_file,
-                        "image_file": image_file,
+                        "mp3_file": f"soundcloud_downloads/{mp3_file}",  # Adjust path
+                        "image_file": f"soundcloud_downloads/img/{image_file}"
+                        if image_file
+                        else None,  # Adjust path
                         "title": title,
                         "link": link,
                     }
@@ -84,53 +88,53 @@ class SoundCloudHTMLPageGenerator:
 
         # Our Jinja2 template (inline). Feel free to move it into a separate file if needed.
         template_str = """<!DOCTYPE html>
-    <html lang='en'>
-    <head>
-    <meta charset='utf-8'/>
-    <title>Downloaded Tracks</title>
-    </head>
-    <body>
-    <h1>Downloaded Tracks from SoundCloud</h1>
-    <button onclick='playAll()'>Play All</button>
-    <audio id='playerAll' controls style='display:block; margin-top:10px;'></audio>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'/>
+  <title>Downloaded Tracks</title>
+</head>
+<body>
+  <h1>Downloaded Tracks from SoundCloud</h1>
+  <button onclick='playAll()'>Play All</button>
+  <audio id='playerAll' controls style='display:block; margin-top:10px;'></audio>
 
-    {% if zip_exists %}
-    <p><a href='{{ zip_name }}' download>Download All as ZIP</a></p>
-    {% endif %}
+  {% if zip_exists %}
+  <p><a href='soundcloud_downloads/{{ zip_name }}' download>Download All as ZIP</a></p>
+  {% endif %}
 
-    <h2>Summary</h2>
-    <ol>
-    {% for track in ordered_tracks %}
-        <li><a href="#{{ track.anchor_id }}">{{ track.title }}</a></li>
-    {% endfor %}
-    </ol>
+  <h2>Summary</h2>
+  <ol>
+  {% for track in ordered_tracks %}
+    <li><a href="#{{ track.anchor_id }}">{{ track.title }}</a></li>
+  {% endfor %}
+  </ol>
 
-    {% for track in ordered_tracks %}
-        <div id='{{ track.anchor_id }}' style='margin-bottom:20px;'>
-        <h2>{{ track.title }}</h2>
-        {% if track.image_file %}
-        <img src='img/{{ track.image_file }}' alt='{{ track.title }}'
-            style='max-width:200px; display:block; margin-bottom:5px;' />
-        {% endif %}
-        <audio controls>
-            <source src='{{ track.mp3_file }}' type='audio/mpeg'>
-        </audio>
-        <p><a href='{{ track.mp3_file }}' download>Download MP3</a></p>
-        <p><a href='{{ track.link }}' target='_blank'>Original SoundCloud Link</a></p>
-        </div>
-        <hr/>
-    {% endfor %}
+  {% for track in ordered_tracks %}
+    <div id='{{ track.anchor_id }}' style='margin-bottom:20px;'>
+      <h2>{{ track.title }}</h2>
+      {% if track.image_file %}
+      <img src='{{ track.image_file }}' alt='{{ track.title }}'
+           style='max-width:200px; display:block; margin-bottom:5px;' />
+      {% endif %}
+      <audio controls>
+        <source src='{{ track.mp3_file }}' type='audio/mpeg'>
+      </audio>
+      <p><a href='{{ track.mp3_file }}' download>Download MP3</a></p>
+      <p><a href='{{ track.link }}' target='_blank'>Original SoundCloud Link</a></p>
+    </div>
+    <hr/>
+  {% endfor %}
 
-    <script>
-        window.allTracks = [
-        {% for mp3_file in all_mp3_files %}
-            "{{ mp3_file }}",
-        {% endfor %}
-        ];
-    </script>
-    <script src='playAll.js'></script>
-    </body>
-    </html>"""
+  <script>
+    window.allTracks = [
+      {% for mp3_file in all_mp3_files %}
+        "soundcloud_downloads/{{ mp3_file }}",
+      {% endfor %}
+    ];
+  </script>
+  <script src='soundcloud_downloads/playAll.js'></script>
+</body>
+</html>"""
 
         template = Template(template_str)
 
@@ -142,7 +146,7 @@ class SoundCloudHTMLPageGenerator:
             all_mp3_files=self.all_mp3_files,
         )
 
-        # Write the rendered HTML to index.html
+        # Write the rendered HTML to index.html in the root folder
         with open(self.html_path, "w", encoding="utf-8") as f:
             f.write(rendered_html)
 
