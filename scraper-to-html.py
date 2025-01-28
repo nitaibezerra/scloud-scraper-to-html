@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import logging
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -14,8 +15,8 @@ logging.basicConfig(
 class SoundCloudDownloader:
     """
     A class to extract SoundCloud links from a list of strings,
-    download the associated MP3 files (using `scdl`), and generate
-    an HTML page listing the downloaded tracks.
+    resolve short links if necessary, download the associated MP3 files
+    (using `scdl`), and generate an HTML page listing the downloaded tracks.
     """
 
     def __init__(self, base_dir="html", sub_dir_name="soundcloud_downloads"):
@@ -42,7 +43,7 @@ class SoundCloudDownloader:
     def process_strings(self, strings):
         """
         Public method to process a list of strings. It extracts SoundCloud links,
-        downloads the tracks, and generates the HTML listing.
+        resolves short URLs, downloads the tracks, and generates the HTML listing.
 
         :param strings: List of strings that may contain SoundCloud links
         """
@@ -51,6 +52,9 @@ class SoundCloudDownloader:
         logging.info(
             f"Extracted {len(self._soundcloud_links)} SoundCloud links: {self._soundcloud_links}"
         )
+
+        self._resolve_short_links()
+        logging.info("Resolved short links to full URLs.")
 
         self._download_tracks()
         logging.info("Completed downloading tracks.")
@@ -61,12 +65,13 @@ class SoundCloudDownloader:
     def _extract_soundcloud_links(self, strings):
         """
         Private method to extract SoundCloud links from the list of strings.
+        Matches both short links (on.soundcloud.com) and full links (soundcloud.com).
         Duplicates are removed and stored in self._soundcloud_links.
 
         :param strings: List of strings that may contain SoundCloud links
         """
         logging.debug("Extracting SoundCloud links from input strings.")
-        pattern = r"(https?://on\.soundcloud\.com/[^\s]+)"
+        pattern = r"(https?://(?:on\.soundcloud\.com|soundcloud\.com)/[^\s]+)"
         found_links = []
 
         for text in strings:
@@ -76,6 +81,28 @@ class SoundCloudDownloader:
         # Remove duplicates
         self._soundcloud_links = list(set(found_links))
         logging.debug(f"Found links: {self._soundcloud_links}")
+
+    def _resolve_short_links(self):
+        """
+        Private method to resolve short SoundCloud links (on.soundcloud.com)
+        to their full URLs using HTTP requests. Updates the links in place.
+        """
+        logging.debug("Resolving short SoundCloud links to full URLs.")
+        resolved_links = []
+        for link in self._soundcloud_links:
+            if "on.soundcloud.com" in link:
+                try:
+                    logging.debug(f"Resolving short link: {link}")
+                    response = requests.head(link, allow_redirects=True)
+                    full_url = response.url
+                    logging.debug(f"Resolved {link} to {full_url}")
+                    resolved_links.append(full_url)
+                except requests.RequestException as e:
+                    logging.error(f"Failed to resolve short link {link}: {e}")
+            else:
+                resolved_links.append(link)
+
+        self._soundcloud_links = resolved_links
 
     def _download_tracks(self):
         """
