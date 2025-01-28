@@ -1,14 +1,16 @@
+import logging
 import os
 import re
-import subprocess
-import logging
-import requests
-import zipfile
 import shutil
+import subprocess
+import unicodedata
+import zipfile
+
+import requests
+from mutagen.id3 import APIC, ID3
 
 # For extracting album art
-from mutagen.id3 import ID3
-from mutagen.id3 import APIC
+from HTML_page_generator import SoundCloudHTMLPageGenerator
 
 # Configure logging
 logging.basicConfig(
@@ -39,9 +41,10 @@ class SoundCloudDownloader:
         self.output_dir = os.path.join(self.base_dir, self.sub_dir_name)
 
         self._soundcloud_links = []
-        # Instead of just storing (link, mp3_file_list),
-        # we'll store (link, [ (mp3_file, cover_img_file), ... ]).
         self._download_results = []
+        self._unique_tracks = (
+            set()
+        )  # Set to keep track of unique normalized MP3 filenames
 
         # Create necessary directories
         os.makedirs(self.output_dir, exist_ok=True)
@@ -84,9 +87,9 @@ class SoundCloudDownloader:
 
     def _extract_soundcloud_links(self, strings):
         """
-        Private method to extract SoundCloud links from the list of strings.
-        Matches both short links (on.soundcloud.com) and full links (soundcloud.com).
-        Duplicates are removed and stored in self._soundcloud_links.
+        Private method to extract SoundCloud links from the list of strings in the order
+        they appear (avoiding duplicates). Matches both short links (on.soundcloud.com)
+        and full links (soundcloud.com). This preserves the original order from the input.
 
         :param strings: List of strings that may contain SoundCloud links
         """
@@ -96,11 +99,12 @@ class SoundCloudDownloader:
 
         for text in strings:
             matches = re.findall(pattern, text)
-            found_links.extend(matches)
+            for link in matches:
+                if link not in found_links:
+                    found_links.append(link)
 
-        # Remove duplicates
-        self._soundcloud_links = list(set(found_links))
-        logging.debug(f"Found links: {self._soundcloud_links}")
+        self._soundcloud_links = found_links
+        logging.debug(f"Found links (in order): {self._soundcloud_links}")
 
     def _resolve_short_links(self):
         """
@@ -130,31 +134,58 @@ class SoundCloudDownloader:
         """
         Private method that iterates over the stored SoundCloud links and
         downloads the tracks in MP3 format using the `scdl` utility.
-        For each MP3 downloaded, we also attempt to extract the embedded image.
-        The result (mp3 file + image file) is stored in self._download_results.
+        For each MP3 downloaded, we also attempt to extract the image.
+        The result (mp3 file + image file) is stored in self._download_results,
+        with a global set (self._unique_tracks) preventing duplicates.
         """
         logging.debug("Starting to download tracks.")
         for link in self._soundcloud_links:
             logging.info(f"Downloading from link: {link}")
+
             files_before = set(os.listdir(self.output_dir))
             self._run_scdl_command(link)
             files_after = set(os.listdir(self.output_dir))
 
             # Identify only the newly downloaded MP3 files
             new_files = files_after - files_before
-            mp3_files = [f for f in new_files if f.lower().endswith(".mp3")]
+            raw_mp3_files = [f for f in new_files if f.lower().endswith(".mp3")]
 
-            if mp3_files:
-                # For each MP3, try to extract the image
-                track_data = []
-                for mp3_file in mp3_files:
-                    cover_img = self._extract_image(mp3_file)
-                    track_data.append((mp3_file, cover_img))
-                    logging.info(f"Downloaded file: {mp3_file}, cover: {cover_img}")
+            track_data_for_this_link = []
 
-                self._download_results.append((link, track_data))
+            for raw_name in raw_mp3_files:
+                norm_name = _normalize_filename(raw_name)
+
+                # Skip if we've already processed this track
+                if norm_name in self._unique_tracks:
+                    logging.warning(f"Skipping duplicate track: {norm_name}")
+                    continue
+
+                # Mark this as new
+                self._unique_tracks.add(norm_name)
+
+                # OPTIONAL: Normalize filename on disk
+                if raw_name != norm_name:
+                    old_path = os.path.join(self.output_dir, raw_name)
+                    new_path = os.path.join(self.output_dir, norm_name)
+                    try:
+                        os.rename(old_path, new_path)
+                        logging.info(
+                            f"Renamed '{raw_name}' -> '{norm_name}' for normalization."
+                        )
+                    except Exception as e:
+                        logging.error(f"Failed to rename file '{raw_name}': {e}")
+                        norm_name = raw_name
+
+                # Extract cover image for this track
+                cover_img = self._extract_image(norm_name)
+                track_data_for_this_link.append((norm_name, cover_img))
+                logging.info(f"Downloaded file: {norm_name}, cover: {cover_img}")
+
+            # Append results only if new MP3 files were found
+            if track_data_for_this_link:
+                self._download_results.append((link, track_data_for_this_link))
             else:
-                logging.warning(f"No MP3 files downloaded for link: {link}")
+                logging.warning(f"No new MP3 files for link: {link}")
 
     def _run_scdl_command(self, link):
         """
@@ -223,98 +254,12 @@ class SoundCloudDownloader:
 
     def _generate_html_page(self):
         """
-        Private method to generate an HTML page (index.html) listing the
-        downloaded tracks in the directory self.output_dir. It includes:
-        - A "Play All" button to play MP3s in sequence
-        - A link to download each MP3
-        - A link to download the ZIP of all MP3s
-        - Cover art images (if found)
-        - References an external JavaScript file (playAll.js) for sequential playback
+        Private method to delegate HTML generation to the SoundCloudHTMLPageGenerator.
         """
-        logging.debug("Generating HTML page.")
-        html_path = os.path.join(self.output_dir, "index.html")
-        zip_name = "all_tracks.zip"
-        zip_path = os.path.join(self.output_dir, zip_name)
-
-        # Gather all MP3s into a single list for the "Play All" functionality
-        all_mp3_files = []
-        for _, track_data in self._download_results:
-            for mp3_file, _ in track_data:
-                all_mp3_files.append(mp3_file)
-
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write("<!DOCTYPE html>\n")
-            f.write("<html lang='en'>\n")
-            f.write("<head>\n")
-            f.write("  <meta charset='utf-8'/>\n")
-            f.write("  <title>Downloaded Tracks</title>\n")
-            f.write("</head>\n")
-            f.write("<body>\n")
-
-            f.write("  <h1>Downloaded Tracks from SoundCloud</h1>\n")
-
-            # Button + hidden audio element for "Play All"
-            f.write("  <button onclick='playAll()'>Play All</button>\n")
-            f.write(
-                "  <audio id='playerAll' controls style='display:block; margin-top:10px;'></audio>\n"
-            )
-
-            # Link to download the zip of all MP3s
-            if os.path.exists(zip_path):
-                f.write(
-                    f"  <p><a href='{zip_name}' download>Download All as ZIP</a></p>\n"
-                )
-
-            # Generate track list
-            for link, track_data in self._download_results:
-                for mp3_file, image_file in track_data:
-                    title = os.path.splitext(mp3_file)[0]
-
-                    f.write("  <div style='margin-bottom:20px;'>\n")
-                    f.write(f"    <h2>{title}</h2>\n")
-
-                    # If there's a cover image, display it
-                    if image_file:
-                        f.write(
-                            f"    <img src='img/{image_file}' alt='{title}' "
-                            f"style='max-width:200px; display:block; margin-bottom:5px;' />\n"
-                        )
-
-                    # Audio player for this single track
-                    f.write("    <audio controls>\n")
-                    f.write(f"      <source src='{mp3_file}' type='audio/mpeg'>\n")
-                    f.write("    </audio>\n")
-
-                    # Direct MP3 download link
-                    f.write(
-                        f"    <p><a href='{mp3_file}' download>Download MP3</a></p>\n"
-                    )
-
-                    # Original SoundCloud link
-                    f.write(
-                        f"    <p><a href='{link}' target='_blank'>Original SoundCloud Link</a></p>\n"
-                    )
-                    f.write("  </div>\n")
-                    f.write("  <hr/>\n")
-
-            #
-            # Place our list of MP3s into a global variable (allTracks) so the external JS can use them.
-            #
-            f.write("<script>\n")
-            f.write("  window.allTracks = [\n")
-            for mp3_file in all_mp3_files:
-                f.write(f"    '{mp3_file}',\n")
-            f.write("  ];\n")
-            f.write("</script>\n")
-
-            # Reference the external JavaScript file
-            # Make sure playAll.js is placed in the same directory (self.output_dir) or adjust the path accordingly.
-            f.write("  <script src='playAll.js'></script>\n")
-
-            f.write("</body>\n")
-            f.write("</html>\n")
-
-        logging.info(f"HTML page generated at: {html_path}")
+        generator = SoundCloudHTMLPageGenerator(
+            download_results=self._download_results, output_dir=self.output_dir
+        )
+        generator.generate_html_page()
 
     def _copy_js_to_output_dir(self):
         """
@@ -334,6 +279,14 @@ class SoundCloudDownloader:
             )
         except Exception as e:
             logging.error(f"Error copying 'playAll.js': {e}")
+
+
+def _normalize_filename(filename):
+    """
+    Normalizes a filename to NFC form to avoid duplication due to different
+    Unicode normalizations (particularly on macOS).
+    """
+    return unicodedata.normalize("NFC", filename)
 
 
 def main():
