@@ -4,12 +4,16 @@
 <head>
     <meta charset='utf-8' />
     <title>Downloaded Tracks</title>
+    <!-- New line: reference the external CSS -->
+    <link rel="stylesheet" href="soundcloud_downloads/style.css" />
 </head>
 
 <body>
     <h1>Louvação à Iemanjá - Pontos Iniciais</h1>
-    <button onclick='playAll()'>Tocar todas</button>
-    <audio id='playerAll' controls style='display:block; margin-top:10px;'></audio>
+
+    <!-- Removed inline styles from the button and audio -->
+    <button id="playAllButton" onclick="playAll()">Tocar todas</button>
+    <audio id="playerAll" controls></audio>
 
     {% if zip_exists %}
     <p><a href='soundcloud_downloads/{{ zip_name }}' download>Baixar tudo em formato ZIP</a></p>
@@ -23,12 +27,14 @@
     </ol>
 
     {% for track in ordered_tracks %}
-    <div id='{{ track.anchor_id }}' style='margin-bottom:20px;'>
+    <!-- Removed inline styles from the div -->
+    <div id='{{ track.anchor_id }}'>
         <h2>{{ track.title }}</h2>
         {% if track.image_file %}
-        <img src='{{ track.image_file }}' alt='{{ track.title }}'
-            style='max-width:200px; display:block; margin-bottom:5px;' />
+        <!-- Removed inline styles from the img -->
+        <img src='{{ track.image_file }}' alt='{{ track.title }}' />
         {% endif %}
+
         <audio controls>
             <source src='{{ track.mp3_file }}' type='audio/mpeg'>
         </audio>
