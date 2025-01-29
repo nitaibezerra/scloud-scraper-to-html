@@ -101,3 +101,22 @@ hr {
         padding: 10px 20px;
     }
 }
+
+nav {
+    background-color: #004d99;
+    padding: 10px;
+    text-align: center;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    margin: 0 15px;
+    padding: 8px 12px;
+    border-radius: 5px;
+}
+
+nav a:hover {
+    background-color: #003366;
+}
