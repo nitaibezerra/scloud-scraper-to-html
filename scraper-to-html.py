@@ -7,6 +7,7 @@ import unicodedata
 import zipfile
 
 import requests
+import yaml  # Biblioteca para carregar arquivos YAML
 from mutagen.id3 import APIC, ID3
 
 # For extracting album art
@@ -289,33 +290,50 @@ def _normalize_filename(filename):
     return unicodedata.normalize("NFC", filename)
 
 
+def load_links_from_yaml(file_path):
+    """
+    Carrega a lista de links do SoundCloud a partir de um arquivo YAML.
+    Se o arquivo não existir ou estiver mal formatado, exibe um erro e retorna uma lista vazia.
+    """
+    if not os.path.exists(file_path):
+        logging.error(
+            f"Arquivo {file_path} não encontrado. Nenhum link será processado."
+        )
+        return []
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = yaml.safe_load(file)
+            return data.get(
+                "soundcloud_links", []
+            )  # Retorna a lista ou uma lista vazia se não existir
+    except yaml.YAMLError as e:
+        logging.error(f"Erro ao carregar {file_path}: {e}")
+        return []
+
+
 def main():
     """
-    Main function to run the script directly. It processes a predefined
-    list of SoundCloud links, downloads the tracks, extracts cover art,
-    creates a ZIP, and generates an HTML page.
+    Função principal para carregar links do arquivo YAML e iniciar o processo de download.
     """
-    strings = [
-        "B1 https://on.soundcloud.com/KG2gZ6KqNwbZrM4q9",
-        "https://on.soundcloud.com/4ht4PfBFpsLjFSnx9",
-        "https://on.soundcloud.com/oWAvTRXLWSN9BXLV8",
-        "B4 https://on.soundcloud.com/41vQDeBNFVnh4PAB8",
-        "B5 https://on.soundcloud.com/w4o34Yk8hDy8iJTj6",
-        "B6 https://on.soundcloud.com/XXMCejYF6ySkJ6Nm9",
-        "B7 https://on.soundcloud.com/sCgPPArMLFxd4bsK8",
-        "B8 https://on.soundcloud.com/55N3TqKMVwPUMuYY7",
-        "B9 https://on.soundcloud.com/G9dKEZVpCgGPZATo9",
-        "B10 https://on.soundcloud.com/VkWWKFPKKmX3Rznn6",
-        "B11 https://on.soundcloud.com/9bQvbKfx8qH96GcW6",
-        "B12 https://on.soundcloud.com/1q4jQM4EWWUTusgG7",
-    ]
+    yaml_file = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "links_list.yaml"
+    )
 
-    logging.info("Starting SoundCloudDownloader script.")
+    logging.info(f"Carregando links do arquivo: {yaml_file}")
+    strings = load_links_from_yaml(yaml_file)
+
+    if not strings:
+        logging.warning("Nenhum link carregado. Verifique o arquivo YAML.")
+        return
+
+    logging.info(f"{len(strings)} links carregados do YAML.")
+
     downloader = SoundCloudDownloader(
         base_dir="html", sub_dir_name="soundcloud_downloads"
     )
     downloader.process_strings(strings)
-    logging.info("Finished processing SoundCloud links.")
+    logging.info("Finalizado o processamento dos links do SoundCloud.")
 
 
 if __name__ == "__main__":
