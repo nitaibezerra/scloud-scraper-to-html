@@ -84,7 +84,7 @@ class SoundCloudDownloader:
         logging.info("Generated HTML page.")
 
         # Copy playAll.js to the output directory
-        self._copy_js_to_output_dir()
+        self._copy_static_files_to_output_dir()
 
     def _extract_soundcloud_links(self, strings):
         """
@@ -262,24 +262,27 @@ class SoundCloudDownloader:
         )
         generator.generate_html_page()
 
-    def _copy_js_to_output_dir(self):
+    def _copy_static_files_to_output_dir(self):
         """
-        Private method to copy the 'playAll.js' file from the script directory
-        to the destination directory (self.output_dir).
+        Private method to copy static files ('playAll.js' and 'style.css')
+        from the script directory to the destination directory (self.output_dir).
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        js_source_path = os.path.join(script_dir, "playAll.js")
-        js_destination_path = os.path.join(self.output_dir, "playAll.js")
+        files_to_copy = ["playAll.js", "style.css"]
 
-        try:
-            shutil.copy(js_source_path, js_destination_path)
-            logging.info(f"Copied 'playAll.js' to {js_destination_path}")
-        except FileNotFoundError:
-            logging.error(
-                f"'playAll.js' not found in the script directory: {js_source_path}"
-            )
-        except Exception as e:
-            logging.error(f"Error copying 'playAll.js': {e}")
+        for filename in files_to_copy:
+            source_path = os.path.join(script_dir, filename)
+            destination_path = os.path.join(self.output_dir, filename)
+
+            try:
+                shutil.copy(source_path, destination_path)
+                logging.info(f"Copied '{filename}' to {destination_path}")
+            except FileNotFoundError:
+                logging.error(
+                    f"'{filename}' not found in the script directory: {source_path}"
+                )
+            except Exception as e:
+                logging.error(f"Error copying '{filename}': {e}")
 
 
 def _normalize_filename(filename):
