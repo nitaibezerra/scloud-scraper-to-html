@@ -75,6 +75,7 @@ class SoundCloudHTMLPageGenerator:
     def _write_html(self):
         """
         Writes the complete HTML page using Jinja2 for templating.
+        The template is stored in an external file `template.html` for better maintainability.
         It includes:
         - A "Play All" button to play MP3s in sequence
         - A numbered summary with anchor links to each track
@@ -86,56 +87,19 @@ class SoundCloudHTMLPageGenerator:
             "Generating the final HTML page with summary and track details using Jinja2."
         )
 
-        # Our Jinja2 template (inline). Feel free to move it into a separate file if needed.
-        template_str = """<!DOCTYPE html>
-<html lang='en'>
-<head>
-  <meta charset='utf-8'/>
-  <title>Downloaded Tracks</title>
-</head>
-<body>
-  <h1>Downloaded Tracks from SoundCloud</h1>
-  <button onclick='playAll()'>Play All</button>
-  <audio id='playerAll' controls style='display:block; margin-top:10px;'></audio>
+        # Path to the external Jinja2 template file
+        template_path = os.path.join(self.output_dir, "../../template.html")
 
-  {% if zip_exists %}
-  <p><a href='soundcloud_downloads/{{ zip_name }}' download>Download All as ZIP</a></p>
-  {% endif %}
+        # Check if the template exists
+        if not os.path.exists(template_path):
+            logging.error(f"Template file not found at {template_path}.")
+            return
 
-  <h2>Summary</h2>
-  <ol>
-  {% for track in ordered_tracks %}
-    <li><a href="#{{ track.anchor_id }}">{{ track.title }}</a></li>
-  {% endfor %}
-  </ol>
+        # Load the template file
+        with open(template_path, "r", encoding="utf-8") as template_file:
+            template_str = template_file.read()
 
-  {% for track in ordered_tracks %}
-    <div id='{{ track.anchor_id }}' style='margin-bottom:20px;'>
-      <h2>{{ track.title }}</h2>
-      {% if track.image_file %}
-      <img src='{{ track.image_file }}' alt='{{ track.title }}'
-           style='max-width:200px; display:block; margin-bottom:5px;' />
-      {% endif %}
-      <audio controls>
-        <source src='{{ track.mp3_file }}' type='audio/mpeg'>
-      </audio>
-      <p><a href='{{ track.mp3_file }}' download>Download MP3</a></p>
-      <p><a href='{{ track.link }}' target='_blank'>Original SoundCloud Link</a></p>
-    </div>
-    <hr/>
-  {% endfor %}
-
-  <script>
-    window.allTracks = [
-      {% for mp3_file in all_mp3_files %}
-        "soundcloud_downloads/{{ mp3_file }}",
-      {% endfor %}
-    ];
-  </script>
-  <script src='soundcloud_downloads/playAll.js'></script>
-</body>
-</html>"""
-
+        # Create the Jinja2 template
         template = Template(template_str)
 
         # Render the template, passing in the dynamic data

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+    <meta charset='utf-8' />
+    <title>Downloaded Tracks</title>
+</head>
+
+<body>
+    <h1>Louvação à Iemanjá - Pontos Iniciais</h1>
+    <button onclick='playAll()'>Tocar todas</button>
+    <audio id='playerAll' controls style='display:block; margin-top:10px;'></audio>
+
+    {% if zip_exists %}
+    <p><a href='soundcloud_downloads/{{ zip_name }}' download>Baixar tudo em formato ZIP</a></p>
+    {% endif %}
+
+    <h2>Índice</h2>
+    <ol>
+        {% for track in ordered_tracks %}
+        <li><a href="#{{ track.anchor_id }}">{{ track.title }}</a></li>
+        {% endfor %}
+    </ol>
+
+    {% for track in ordered_tracks %}
+    <div id='{{ track.anchor_id }}' style='margin-bottom:20px;'>
+        <h2>{{ track.title }}</h2>
+        {% if track.image_file %}
+        <img src='{{ track.image_file }}' alt='{{ track.title }}'
+            style='max-width:200px; display:block; margin-bottom:5px;' />
+        {% endif %}
+        <audio controls>
+            <source src='{{ track.mp3_file }}' type='audio/mpeg'>
+        </audio>
+        <p><a href='{{ track.mp3_file }}' download>Download MP3</a></p>
+        <p><a href='{{ track.link }}' target='_blank'>Original SoundCloud Link</a></p>
+    </div>
+    <hr />
+    {% endfor %}
+
+    <script>
+        window.allTracks = [
+            {% for mp3_file in all_mp3_files %}
+        "soundcloud_downloads/{{ mp3_file }}",
+            {% endfor %}
+    ];
+    </script>
+    <script src='soundcloud_downloads/playAll.js'></script>
+</body>
+
+</html>
