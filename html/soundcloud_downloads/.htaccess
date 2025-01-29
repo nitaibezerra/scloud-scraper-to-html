@@ -1,3 +1,3 @@
-<FilesMatch "\.(mp3|js|css|jpg|png|gif)$">
+<FilesMatch "\.(mp3|jpg|png|gif)$">
     Header set Cache-Control "public, max-age=86400, must-revalidate"
 </FilesMatch>
