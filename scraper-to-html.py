@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import re
@@ -29,7 +30,7 @@ class SoundCloudDownloader:
     listing the downloaded tracks (with an option to download all as a ZIP).
     """
 
-    def __init__(self, base_dir="html", sub_dir_name="soundcloud_downloads"):
+    def __init__(self, base_dir, sub_dir_name="soundcloud_downloads"):
         """
         Initializes the downloader with a base directory and a subdirectory
         to store downloads and the HTML page.
@@ -318,10 +319,25 @@ def load_links_from_yaml(file_path):
 def main():
     """
     Função principal para carregar links do arquivo YAML e iniciar o processo de download.
+    Agora aceita um argumento de linha de comando para especificar o caminho do arquivo YAML.
     """
-    yaml_file = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "links_list.yaml"
+    parser = argparse.ArgumentParser(
+        description="Processa links do SoundCloud a partir de um arquivo YAML."
     )
+    parser.add_argument(
+        "--yaml",
+        type=str,
+        default=os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "links_list.yaml"
+        ),
+        help="Caminho para o arquivo YAML contendo os links do SoundCloud (padrão: links_list.yaml no diretório do script).",
+    )
+
+    args = parser.parse_args()
+    yaml_file = args.yaml
+
+    # Deriva o nome-base do diretório a partir do nome do arquivo YAML
+    base_name = os.path.splitext(os.path.basename(yaml_file))[0]
 
     logging.info(f"Carregando links do arquivo: {yaml_file}")
     strings = load_links_from_yaml(yaml_file)
@@ -333,7 +349,7 @@ def main():
     logging.info(f"{len(strings)} links carregados do YAML.")
 
     downloader = SoundCloudDownloader(
-        base_dir="html", sub_dir_name="soundcloud_downloads"
+        base_dir=base_name, sub_dir_name="soundcloud_downloads"
     )
     downloader.process_strings(strings)
     logging.info("Finalizado o processamento dos links do SoundCloud.")
